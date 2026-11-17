@@ -1,0 +1,229 @@
+import { useMemo, useRef, useState } from 'react'
+import type { CityVisit, ImportProgress, ImportSummary, PhotoRecord, Trip } from '../lib/types'
+
+/** 打开时随机展示一句，点击可换 */
+const QUOTES: { text: string; author?: string }[] = [
+  { text: '世界是一本书，不旅行的人只读了其中一页。', author: '圣奥古斯丁' },
+  { text: '旅行的真谛，不是运动，而是带着你的灵魂，去寻找生命的春光。', author: '梭罗' },
+  { text: '身体和灵魂，总有一个在路上。' },
+  { text: '走过的路，每一步都算数。' },
+  { text: '重要的不是目的地，而是沿途的风景，和看风景的心情。' },
+  { text: '地图上的每一个点，都藏着一段出发的理由。' },
+  { text: '把日子过成值得回忆的样子，就是最好的旅行。' },
+  { text: '山川湖海，都是时间的注脚。' },
+  { text: '照片会变旧，回忆不会。' },
+  { text: '去看世界，也顺便找到自己。' },
+]
+
+interface SidebarProps {
+  photos: PhotoRecord[]
+  cityVisits: CityVisit[]
+  trips: Trip[]
+  progress: ImportProgress | null
+  summary: ImportSummary | null
+  importing: boolean
+  canPickDirectory: boolean
+  placement: { id: string; name: string } | null
+  onImportDirectory: () => void
+  onImportFiles: (files: FileList | File[]) => void
+  onSelectTrip: (trip: Trip) => void
+  onPlaceRequest: (photo: PhotoRecord) => void
+  onCancelPlacement: () => void
+}
+
+function fmtDate(ms: number): string {
+  const d = new Date(ms)
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+}
+
+export default function Sidebar({
+  photos,
+  cityVisits,
+  trips,
+  progress,
+  summary,
+  importing,
+  canPickDirectory,
+  placement,
+  onImportDirectory,
+  onImportFiles,
+  onSelectTrip,
+  onPlaceRequest,
+  onCancelPlacement,
+}: SidebarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const located = photos.filter((p) => p.lat !== undefined && p.lng !== undefined)
+  const noGps = photos.length - located.length
+  const videoCount = photos.filter((p) => p.kind === 'video').length
+  const undetermined = photos.filter((p) => p.lat === undefined)
+
+  const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * QUOTES.length))
+  const quote = QUOTES[quoteIndex]
+
+  const welcomeLine = useMemo(() => {
+    if (photos.length === 0) return '把手边的照片交给地图，让足迹自己讲故事。'
+    const parts = [`已点亮 ${cityVisits.length} 座城市`, `${trips.length} 段旅程`]
+    const last = trips.length > 0 ? trips[trips.length - 1].endAt : null
+    if (last) {
+      const days = Math.max(0, Math.floor((Date.now() - last) / 86400000))
+      parts.push(days === 0 ? '最近一次出发就在今天' : `上次出发 · ${days} 天前`)
+    }
+    return parts.join(' · ')
+  }, [photos.length, cityVisits.length, trips])
+
+  return (
+    <aside className="sidebar">
+      <header className="brand">
+        <div className="brand-mark">FOOTPRINT ALBUM</div>
+        <button
+          className="brand-quote"
+          onClick={() => setQuoteIndex((i) => (i + 1) % QUOTES.length)}
+          title="换一句"
+        >
+          <span className="brand-quote-text">“{quote.text}”</span>
+          {quote.author && <span className="brand-quote-author">—— {quote.author}</span>}
+        </button>
+        <div className="brand-line">{welcomeLine}</div>
+      </header>
+
+      <section className="panel">
+        <div className="btn-row">
+          {canPickDirectory && (
+            <button className="btn primary" disabled={importing} onClick={onImportDirectory}>
+              选择文件夹导入
+            </button>
+          )}
+          <button className="btn" disabled={importing} onClick={() => fileInputRef.current?.click()}>
+            选择照片
+          </button>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
+          multiple
+          hidden
+          onChange={(e) => {
+            if (e.target.files?.length) onImportFiles(e.target.files)
+            e.target.value = ''
+          }}
+        />
+        <p className="hint">也可以把整个文件夹拖进右侧地图。照片 JPEG / PNG / WebP · 视频 MP4 / MOV。</p>
+
+        {progress && (
+          <div className="progress-block">
+            <div className="progress-line">
+              {progress.phase === 'scanning' ? '正在扫描文件夹…' : `正在处理 ${progress.current} / ${progress.total}`}
+            </div>
+            <div className="progress-bar">
+              <div
+                className="progress-fill"
+                style={{ width: progress.total > 0 ? `${(progress.current / progress.total) * 100}%` : '10%' }}
+              />
+            </div>
+            {progress.fileName && <div className="progress-file">{progress.fileName}</div>}
+          </div>
+        )}
+
+        {summary && !importing && (
+          <p className="import-summary">
+            扫描 {summary.scanned} 张 · 新增 {summary.imported} · 已存在 {summary.skippedExisting}
+            {summary.thumbRefreshed > 0 && ` · 升级缩略图 ${summary.thumbRefreshed}`} · 无定位 {summary.noGps} · 失败{' '}
+            {summary.failed}
+          </p>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="stats">
+          <div className="stat">
+            <span className="stat-num">{photos.length}</span>
+            <span className="stat-label">媒体</span>
+          </div>
+          <div className="stat">
+            <span className="stat-num">{located.length}</span>
+            <span className="stat-label">已定位</span>
+          </div>
+          <div className="stat">
+            <span className="stat-num">{cityVisits.length}</span>
+            <span className="stat-label">城市</span>
+          </div>
+          <div className="stat">
+            <span className="stat-num">{trips.length}</span>
+            <span className="stat-label">行程</span>
+          </div>
+        </div>
+        <p className="hint">
+          {videoCount > 0 && `含 ${videoCount} 个视频 · `}
+          {noGps > 0 ? `${noGps} 个媒体没有 GPS，可在下方手动标点` : '全部媒体已定位'}
+        </p>
+      </section>
+
+      {undetermined.length > 0 && (
+        <section className="panel">
+          <h2>手动标点</h2>
+          <ul className="place-list">
+            {undetermined.map((p) => {
+              const active = placement?.id === p.id
+              return (
+                <li key={p.id}>
+                  <button
+                    className={`place-item${active ? ' active' : ''}`}
+                    onClick={() => (active ? onCancelPlacement() : onPlaceRequest(p))}
+                  >
+                    <span>{p.kind === 'video' ? '🎬' : '🖼'}</span>
+                    <span className="place-name" title={p.dirPath}>
+                      {p.fileName}
+                    </span>
+                    <span className="place-action">{active ? '取消' : '标点'}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+
+      {cityVisits.length > 0 && (
+        <section className="panel">
+          <h2>点亮的城市</h2>
+          <div className="chips">
+            {cityVisits.map((c) => (
+              <span key={c.cityId} className="chip" title={`首次到访 ${fmtDate(c.firstVisitAt)} · ${c.count} 张照片`}>
+                {c.name}
+                {c.count > 1 && <em> ×{c.count}</em>}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {trips.length > 0 && (
+        <section className="panel">
+          <h2>旅行行程</h2>
+          <ul className="trip-list">
+            {trips.map((t) => (
+              <li key={t.id}>
+                <button className="trip-item" onClick={() => onSelectTrip(t)}>
+                  <span className="trip-date">
+                    {fmtDate(t.startAt)}
+                    {fmtDate(t.startAt) !== fmtDate(t.endAt) && ` – ${fmtDate(t.endAt)}`}
+                  </span>
+                  <span className="trip-count">{t.photos.length} 张</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <footer className="sidebar-footer">
+        数据保存在本机浏览器 IndexedDB ·{' '}
+        <a href="https://github.com/" target="_blank" rel="noreferrer">
+          Footprint Album
+        </a>
+      </footer>
+    </aside>
+  )
+}
