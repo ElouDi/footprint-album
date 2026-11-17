@@ -40,5 +40,9 @@
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "repository": {
+    "url": "https://github.com/ElouDi/footprint-album.git"
+  },
+  "homepage": "https://eloudi.github.io/footprint-album/"
 }

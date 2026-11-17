@@ -1,5 +1,7 @@
 # 足迹相册 Footprint Album
 
+[在线演示](https://eloudi.github.io/footprint-album/) · [GitHub 仓库](https://github.com/ElouDi/footprint-album)
+
 从照片生成足迹地图与旅行相册的开源 Web 应用：**导入照片 → 读取 EXIF 地理位置 → 在地图上点亮你去过的城市 → 按旅行自动聚类成相册**。全程本地运行，照片不上传。
 
 > 灵感来自 Google Play 上的 [Footprint Map](https://play.google.com/store/apps/details?id=com.jcstudio.footprintmap)（闭源），以及 iPhone 相册的地图视图。

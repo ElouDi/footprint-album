@@ -220,8 +220,8 @@ export default function Sidebar({
 
       <footer className="sidebar-footer">
         数据保存在本机浏览器 IndexedDB ·{' '}
-        <a href="https://github.com/" target="_blank" rel="noreferrer">
-          Footprint Album
+        <a href="https://github.com/ElouDi/footprint-album" target="_blank" rel="noreferrer">
+          GitHub
         </a>
       </footer>
     </aside>
