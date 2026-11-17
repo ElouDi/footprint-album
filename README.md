@@ -75,7 +75,7 @@ npm run build-cities  # 重新生成 public/data/cities.json（Natural Earth + �
 
 ## 路线图
 
-- [ ] 行程相册页（按天分组浏览 + 行程路径线）
+- [x] 行程相册页（按天分组浏览 + 行程路径线）
 - [ ] 回忆视图："N 年前的今天"、同一城市不同年份对比
 - [ ] HEIC 照片支持（wasm 解码）、HEVC 视频播放
 - [ ] 自定义底图瓦片源设置

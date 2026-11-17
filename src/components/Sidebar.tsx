@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
+import type { CityEntry } from '../lib/cities'
 import type { CityVisit, ImportProgress, ImportSummary, PhotoRecord, Trip } from '../lib/types'
+import TripDetail from './TripDetail'
 
 /** 打开时随机展示一句，点击可换 */
 const QUOTES: { text: string; author?: string }[] = [
@@ -24,9 +26,13 @@ interface SidebarProps {
   importing: boolean
   canPickDirectory: boolean
   placement: { id: string; name: string } | null
+  activeTrip: Trip | null
+  cities: CityEntry[] | null
   onImportDirectory: () => void
   onImportFiles: (files: FileList | File[]) => void
   onSelectTrip: (trip: Trip) => void
+  onBackFromTrip: () => void
+  onOpenPhoto: (photo: PhotoRecord) => void
   onPlaceRequest: (photo: PhotoRecord) => void
   onCancelPlacement: () => void
 }
@@ -45,9 +51,13 @@ export default function Sidebar({
   importing,
   canPickDirectory,
   placement,
+  activeTrip,
+  cities,
   onImportDirectory,
   onImportFiles,
   onSelectTrip,
+  onBackFromTrip,
+  onOpenPhoto,
   onPlaceRequest,
   onCancelPlacement,
 }: SidebarProps) {
@@ -160,9 +170,13 @@ export default function Sidebar({
         </p>
       </section>
 
-      {undetermined.length > 0 && (
-        <section className="panel">
-          <h2>手动标点</h2>
+      {activeTrip ? (
+        <TripDetail trip={activeTrip} cities={cities} onBack={onBackFromTrip} onOpenPhoto={onOpenPhoto} />
+      ) : (
+        <>
+          {undetermined.length > 0 && (
+            <section className="panel">
+              <h2>手动标点</h2>
           <ul className="place-list">
             {undetermined.map((p) => {
               const active = placement?.id === p.id
@@ -199,23 +213,25 @@ export default function Sidebar({
         </section>
       )}
 
-      {trips.length > 0 && (
-        <section className="panel">
-          <h2>旅行行程</h2>
-          <ul className="trip-list">
-            {trips.map((t) => (
-              <li key={t.id}>
-                <button className="trip-item" onClick={() => onSelectTrip(t)}>
-                  <span className="trip-date">
-                    {fmtDate(t.startAt)}
-                    {fmtDate(t.startAt) !== fmtDate(t.endAt) && ` – ${fmtDate(t.endAt)}`}
-                  </span>
-                  <span className="trip-count">{t.photos.length} 张</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+          {trips.length > 0 && (
+            <section className="panel">
+              <h2>旅行行程</h2>
+              <ul className="trip-list">
+                {trips.map((t) => (
+                  <li key={t.id}>
+                    <button className="trip-item" onClick={() => onSelectTrip(t)}>
+                      <span className="trip-date">
+                        {fmtDate(t.startAt)}
+                        {fmtDate(t.startAt) !== fmtDate(t.endAt) && ` – ${fmtDate(t.endAt)}`}
+                      </span>
+                      <span className="trip-count">{t.photos.length} 张</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       )}
 
       <footer className="sidebar-footer">

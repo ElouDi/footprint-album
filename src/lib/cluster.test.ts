@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { haversineKm, segmentTrips, TRIP_DISTANCE_GAP_KM, TRIP_TIME_GAP_MS } from './cluster'
+import { groupByDay, haversineKm, segmentTrips, TRIP_DISTANCE_GAP_KM, TRIP_TIME_GAP_MS } from './cluster'
 import type { PhotoRecord } from './types'
 
 function photo(partial: Partial<PhotoRecord> & { id: string }): PhotoRecord {
@@ -68,5 +68,29 @@ describe('segmentTrips', () => {
 
   it('空列表返回空行程', () => {
     expect(segmentTrips([])).toEqual([])
+  })
+})
+
+describe('groupByDay', () => {
+  it('按自然日分组并保持顺序', () => {
+    // 本地时区构造，分组键与本地日历一致，跨时区稳定
+    const d1 = new Date(2024, 3, 3, 10, 30).getTime() // 2024-04-03
+    const d2 = new Date(2024, 3, 4, 9, 0).getTime() // 2024-04-04
+    const photos = [
+      photo({ id: 'a', takenAt: d1 + 3600 * 1000 }),
+      photo({ id: 'b', takenAt: d1 + 7200 * 1000 }),
+      photo({ id: 'c', takenAt: d2 }),
+    ]
+    const groups = groupByDay(photos)
+    expect(groups.size).toBe(2)
+    const keys = [...groups.keys()]
+    expect(keys[0]).toBe('2024-04-03')
+    expect(groups.get('2024-04-03')?.map((p) => p.id)).toEqual(['a', 'b'])
+    expect(groups.get('2024-04-04')?.map((p) => p.id)).toEqual(['c'])
+  })
+
+  it('无拍摄时间的照片不参与分组', () => {
+    const groups = groupByDay([photo({ id: 'x' })])
+    expect(groups.size).toBe(0)
   })
 })

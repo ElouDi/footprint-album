@@ -12,6 +12,8 @@ interface MapViewProps {
   /** 手动标点模式：点击地图落点 */
   placement?: { name: string } | null
   onMapClick?: (lng: number, lat: number) => void
+  /** 行程轨迹：按拍摄顺序连接的坐标（null 清除） */
+  tripPath?: [number, number][] | null
 }
 
 type ClusterFeature = {
@@ -26,7 +28,7 @@ type ClusterFeature = {
   }
 }
 
-export default function MapView({ photos, focus, onOpenPhoto, placement, onMapClick }: MapViewProps) {
+export default function MapView({ photos, focus, onOpenPhoto, placement, onMapClick, tripPath }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const indexRef = useRef<Supercluster<{ id: string }> | null>(null)
@@ -179,6 +181,53 @@ export default function MapView({ photos, focus, onOpenPhoto, placement, onMapCl
     if (!map) return
     map.getCanvas().style.cursor = placement ? 'crosshair' : ''
   }, [placement])
+
+  // 行程轨迹线（光晕 + 实线两层，按拍摄顺序连接）
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const ensureLayers = () => {
+      if (map.getSource('trip-path')) return
+      map.addSource('trip-path', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: 'trip-path-glow',
+        type: 'line',
+        source: 'trip-path',
+        paint: { 'line-color': '#4f8cff', 'line-width': 10, 'line-opacity': 0.22, 'line-blur': 5 },
+      })
+      map.addLayer({
+        id: 'trip-path-line',
+        type: 'line',
+        source: 'trip-path',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#9dbdff', 'line-width': 2.5, 'line-opacity': 0.95 },
+      })
+    }
+
+    const applyData = () => {
+      const source = map.getSource('trip-path') as maplibregl.GeoJSONSource | undefined
+      if (!source) return
+      source.setData(
+        tripPath && tripPath.length > 1
+          ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: tripPath } }
+          : { type: 'FeatureCollection', features: [] },
+      )
+    }
+
+    if (map.isStyleLoaded()) {
+      ensureLayers()
+      applyData()
+    } else {
+      map.once('style.load', () => {
+        ensureLayers()
+        applyData()
+      })
+    }
+  }, [tripPath])
 
   return <div ref={containerRef} className="map-container" />
 }

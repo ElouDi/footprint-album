@@ -37,14 +37,12 @@ export default function App() {
   const [focus, setFocus] = useState<{ points: [number, number][]; key: number } | null>(null)
   const [placement, setPlacement] = useState<{ id: string; name: string } | null>(null)
 
-  // 城市数据只加载一次，打开灯箱时按坐标就近取城市名
+  // 城市数据只加载一次：状态供组件使用，ref 供回调即时读取
+  const [cities, setCities] = useState<CityEntry[] | null>(null)
   const citiesRef = useRef<CityEntry[] | null>(null)
+  citiesRef.current = cities
   useEffect(() => {
-    void loadCities()
-      .then((c) => {
-        citiesRef.current = c
-      })
-      .catch(() => {})
+    void loadCities().then(setCities).catch(() => {})
   }, [])
 
   const trips = useMemo(() => segmentTrips(photos), [photos])
@@ -55,6 +53,19 @@ export default function App() {
         .sort((a, b) => (a.takenAt ?? 0) - (b.takenAt ?? 0)),
     [photos],
   )
+
+  const [activeTrip, setActiveTrip] = useState<Trip | null>(null)
+
+  // 灯箱导航范围：行程详情内翻行程照片，否则翻全部已定位媒体
+  const lightboxPhotos = useMemo(() => (activeTrip ? activeTrip.photos : locatedPhotos), [activeTrip, locatedPhotos])
+
+  // 行程轨迹：已定位照片按拍摄顺序连线
+  const tripPath = useMemo<[number, number][] | null>(() => {
+    if (!activeTrip) return null
+    return activeTrip.photos
+      .filter((p) => p.lat !== undefined && p.lng !== undefined)
+      .map((p) => [p.lng as number, p.lat as number])
+  }, [activeTrip])
 
   const openLightbox = useCallback((photo: PhotoRecord) => {
     const city =
@@ -131,11 +142,14 @@ export default function App() {
   )
 
   const handleSelectTrip = useCallback((trip: Trip) => {
+    setActiveTrip(trip)
     const points = trip.photos
       .filter((p) => p.lat !== undefined && p.lng !== undefined)
       .map((p) => [p.lng as number, p.lat as number] as [number, number])
     if (points.length > 0) setFocus({ points, key: Date.now() })
   }, [])
+
+  const handleBackFromTrip = useCallback(() => setActiveTrip(null), [])
 
   return (
     <div
@@ -152,9 +166,13 @@ export default function App() {
         importing={importing}
         canPickDirectory={supportsDirectoryPicker()}
         placement={placement}
+        activeTrip={activeTrip}
+        cities={cities}
         onImportDirectory={handleImportDirectory}
         onImportFiles={handleImportFiles}
         onSelectTrip={handleSelectTrip}
+        onBackFromTrip={handleBackFromTrip}
+        onOpenPhoto={openLightbox}
         onPlaceRequest={handlePlaceRequest}
         onCancelPlacement={handleCancelPlacement}
       />
@@ -177,6 +195,7 @@ export default function App() {
           onOpenPhoto={openLightbox}
           placement={placement}
           onMapClick={handleMapClick}
+          tripPath={tripPath}
         />
         {placement && (
           <div className="placement-banner">
@@ -193,7 +212,7 @@ export default function App() {
       </main>
       {lightbox && (
         <Lightbox
-          photos={locatedPhotos}
+          photos={lightboxPhotos}
           entry={lightbox}
           onNavigate={openLightbox}
           onClose={() => setLightbox(null)}
