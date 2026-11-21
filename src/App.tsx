@@ -12,6 +12,7 @@ import {
 } from './lib/importer'
 import { segmentTrips, nearestNeighborChain } from './lib/cluster'
 import { findNearestCity, loadCities, type CityEntry } from './lib/cities'
+import { normalizeSidebarOrder } from './lib/sidebarOrder'
 import type { CityVisit, ImportProgress, ImportSummary, PhotoRecord, Trip } from './lib/types'
 import Sidebar from './components/Sidebar'
 import MapView from './components/MapView'
@@ -54,6 +55,8 @@ export default function App() {
   const browseByTime = useLiveQuery(async () => (await db.settings.get('browseByTime'))?.value === true, [], false)
   const basemapSetting = useLiveQuery(async () => (await db.settings.get('basemap'))?.value as string | undefined, [])
   const basemapId = basemapSetting ?? DEFAULT_BASEMAP.id
+  const sidebarOrderSetting = useLiveQuery(async () => (await db.settings.get('sidebarOrder'))?.value, [])
+  const sidebarOrder = useMemo(() => normalizeSidebarOrder(sidebarOrderSetting), [sidebarOrderSetting])
 
   const handleBrowseByTimeChange = useCallback((v: boolean) => {
     void db.settings.put({ key: 'browseByTime', value: v })
@@ -61,6 +64,10 @@ export default function App() {
 
   const handleBasemapChange = useCallback((id: string) => {
     void db.settings.put({ key: 'basemap', value: id })
+  }, [])
+
+  const handleSidebarOrderChange = useCallback((ids: string[]) => {
+    void db.settings.put({ key: 'sidebarOrder', value: ids })
   }, [])
 
   // 窄屏下需要看到地图的交互（选行程/标点/看图）自动收起侧栏
@@ -250,6 +257,7 @@ export default function App() {
         activeTrip={activeTrip}
         cities={cities}
         sidebarOpen={sidebarOpen}
+        sidebarOrder={sidebarOrder}
         onOpenMemory={handleOpenMemory}
         onOpenSettings={handleOpenSettings}
         onCloseSidebar={() => setSidebarOpen(false)}
@@ -319,6 +327,8 @@ export default function App() {
           onBrowseByTimeChange={handleBrowseByTimeChange}
           basemapId={basemapId}
           onBasemapChange={handleBasemapChange}
+          sidebarOrder={sidebarOrder}
+          onSidebarOrderChange={handleSidebarOrderChange}
           onClose={() => setSettingsOpen(false)}
         />
       )}

@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { BASEMAPS } from '../lib/basemaps'
+import { SIDEBAR_SECTION_NAMES, type SidebarSectionId } from '../lib/sidebarOrder'
 
 interface SettingsPageProps {
   browseByTime: boolean
   onBrowseByTimeChange: (v: boolean) => void
   basemapId: string
   onBasemapChange: (id: string) => void
+  sidebarOrder: string[]
+  onSidebarOrderChange: (ids: string[]) => void
   onClose: () => void
 }
 
@@ -19,6 +22,8 @@ export default function SettingsPage({
   onBrowseByTimeChange,
   basemapId,
   onBasemapChange,
+  sidebarOrder,
+  onSidebarOrderChange,
   onClose,
 }: SettingsPageProps) {
   const mediaCount = useLiveQuery(() => db.photos.count(), [], 0)
@@ -31,6 +36,14 @@ export default function SettingsPage({
     const timer = setTimeout(() => setClearArmed(false), 5000)
     return () => clearTimeout(timer)
   }, [clearArmed])
+
+  const move = (index: number, delta: number) => {
+    const next = [...sidebarOrder]
+    const target = index + delta
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    onSidebarOrderChange(next)
+  }
 
   const handleClearData = async () => {
     if (!clearArmed) {
@@ -96,6 +109,48 @@ export default function SettingsPage({
               ))}
             </select>
           </label>
+        </section>
+
+        <section className="panel">
+          <h2>侧栏栏目顺序</h2>
+          <p className="hint" style={{ margin: '0 0 8px' }}>
+            上下调整侧栏里各栏的出现顺序
+          </p>
+          <ul className="order-list">
+            {sidebarOrder.map((id, i) => (
+              <li key={id} className="order-row">
+                <span className="order-name">{SIDEBAR_SECTION_NAMES[id as SidebarSectionId] ?? id}</span>
+                <span className="order-btns">
+                  <button
+                    className="order-btn"
+                    disabled={i === 0}
+                    onClick={() => move(i, -1)}
+                    aria-label="上移"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    className="order-btn"
+                    disabled={i === sidebarOrder.length - 1}
+                    onClick={() => move(i, 1)}
+                    aria-label="下移"
+                  >
+                    ↓
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <button
+            className="order-reset"
+            onClick={() =>
+              onSidebarOrderChange(
+                Object.keys(SIDEBAR_SECTION_NAMES) as SidebarSectionId[],
+              )
+            }
+          >
+            恢复默认顺序
+          </button>
         </section>
 
         <section className="panel">
