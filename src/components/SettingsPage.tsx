@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { BASEMAPS } from '../lib/basemaps'
+import { downloadBackup, validateBackup, type BackupFile } from '../lib/backup'
 import { SIDEBAR_SECTION_NAMES, type SidebarSectionId } from '../lib/sidebarOrder'
 
 interface SettingsPageProps {
@@ -29,6 +30,34 @@ export default function SettingsPage({
   const mediaCount = useLiveQuery(() => db.photos.count(), [], 0)
   const thumbCount = useLiveQuery(() => db.thumbs.count(), [], 0)
   const [clearArmed, setClearArmed] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [pendingImport, setPendingImport] = useState<BackupFile | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImportFile = (file: File) => {
+    setPendingImport(null)
+    setImportError(null)
+    void (async () => {
+      try {
+        const json = JSON.parse(await file.text())
+        const check = validateBackup(json)
+        if (!check.ok) {
+          setImportError(check.reason)
+          return
+        }
+        setPendingImport(check.data)
+      } catch {
+        setImportError('文件读取失败')
+      }
+    })()
+  }
+
+  const handleRestore = async () => {
+    if (!pendingImport) return
+    await import('../lib/backup').then((m) => m.restoreBackup(pendingImport))
+    window.location.reload()
+  }
 
   // 进入页面后 5 秒未确认，解除"清除"武装状态
   useEffect(() => {
@@ -163,13 +192,52 @@ export default function SettingsPage({
               </div>
             </div>
           </div>
+          <div className="btn-row" style={{ marginBottom: 10 }}>
+            <button
+              className="btn"
+              disabled={exporting || mediaCount === 0}
+              onClick={() => {
+                setExporting(true)
+                void downloadBackup().finally(() => setExporting(false))
+              }}
+            >
+              {exporting ? '正在导出…' : '导出备份（JSON）'}
+            </button>
+            <button className="btn" onClick={() => importInputRef.current?.click()}>
+              导入备份…
+            </button>
+          </div>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json,application/json"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleImportFile(f)
+              e.target.value = ''
+            }}
+          />
+          {importError && <p className="import-error">{importError}</p>}
+          {pendingImport && (
+            <div className="import-confirm">
+              <p className="hint">
+                已读取备份：{pendingImport.photos.length} 张媒体 · {pendingImport.thumbs.length} 张缩略图 · 导出于{' '}
+                {new Date(pendingImport.exportedAt).toLocaleString('zh-CN')}
+              </p>
+              <button className="danger-btn armed" onClick={() => void handleRestore()}>
+                确认导入（覆盖当前数据）
+              </button>
+            </div>
+          )}
           <button
             className={`danger-btn${clearArmed ? ' armed' : ''}`}
             onClick={() => void handleClearData()}
+            style={{ marginTop: 10 }}
           >
             {clearArmed ? '再次点击确认清除（不可恢复）' : '清除所有数据…'}
           </button>
-          <p className="hint">清除后回到首次打开的状态；照片原文件不受影响，可重新导入。</p>
+          <p className="hint">备份与清除只影响本机浏览器里的数据；照片原文件始终在你的磁盘上，可重新导入。</p>
         </section>
 
         <section className="panel">

@@ -170,6 +170,20 @@ body {
   font-weight: 600;
 }
 
+.import-error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: rgba(255, 140, 140, 0.95);
+}
+
+.import-confirm {
+  margin-top: 4px;
+}
+
+.import-confirm .danger-btn {
+  width: 100%;
+}
+
 .about-row {
   display: flex;
   justify-content: space-between;
