@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getPlaceName } from '../lib/geocode'
 import { googleStreetViewUrl, osmUrl } from '../lib/links'
 import { thumbUrl } from '../lib/thumbUrls'
 import type { PhotoRecord } from '../lib/types'
@@ -34,10 +35,13 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
   const { photo, cityName } = entry
   const [src, setSrc] = useState<string | null>(null)
   const [showingOriginal, setShowingOriginal] = useState(false)
+  const [placeName, setPlaceName] = useState<string | null>(cityName ?? null)
 
   const index = photos.findIndex((p) => p.id === photo.id)
   const hasPrev = index > 0
   const hasNext = index >= 0 && index < photos.length - 1
+  const lat = photo.lat
+  const lng = photo.lng
 
   // 切换照片时重置图片来源：先出缩略图，句柄可用再换原图
   useEffect(() => {
@@ -68,6 +72,22 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
       if (revoked) URL.revokeObjectURL(revoked)
     }
   }, [photo, onClose])
+
+  // 区级地名：先显示离线城市名兜底，再用 Nominatim 反查覆盖（结果按坐标缓存）
+  useEffect(() => {
+    let cancelled = false
+    setPlaceName(cityName ?? null)
+    if (lat === undefined || lng === undefined) return
+
+    void (async () => {
+      const name = await getPlaceName(lat, lng, cityName)
+      if (!cancelled && name) setPlaceName(name)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [lat, lng, cityName])
 
   // 键盘操作：Esc 关闭，← → 切换
   useEffect(() => {
@@ -137,12 +157,11 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
         </div>
 
         <div className="lightbox-meta" onClick={(e) => e.stopPropagation()}>
-          <div className="lightbox-name" title={photo.dirPath}>
-            {photo.fileName}
+          <div className={`lightbox-location${placeName ? '' : ' muted-line'}`}>
+            📍 {placeName ?? '位置未记录'}
           </div>
           <div className="lightbox-tags">
             {photo.takenAt !== undefined && <span className="lightbox-tag">{fmtDateTime(photo.takenAt)}</span>}
-            {cityName && <span className="lightbox-tag city">{cityName}</span>}
             {coords && <span className="lightbox-tag">{coords}</span>}
             {coords && (
               <a
@@ -179,6 +198,9 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
                 {photo.kind === 'video' ? '封面预览（重新导入后可播放）' : '缩略图（重新导入后可看原图）'}
               </span>
             )}
+          </div>
+          <div className="lightbox-file" title={photo.dirPath}>
+            {photo.dirPath}
           </div>
         </div>
       </div>
