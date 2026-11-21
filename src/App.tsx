@@ -15,6 +15,7 @@ import type { CityVisit, ImportProgress, ImportSummary, PhotoRecord, Trip } from
 import Sidebar from './components/Sidebar'
 import MapView from './components/MapView'
 import Lightbox from './components/Lightbox'
+import MemoryView from './components/MemoryView'
 
 // useLiveQuery 尚未返回时的稳定空数组，避免下游 useMemo 依赖抖动
 const EMPTY_PHOTOS: PhotoRecord[] = []
@@ -70,9 +71,15 @@ export default function App() {
   )
 
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null)
+  const [memoryOpen, setMemoryOpen] = useState(false)
+  /** 灯箱导航范围：由打开入口决定（回忆板块 / 行程 / 全部已定位） */
+  const [lightboxNav, setLightboxNav] = useState<PhotoRecord[] | null>(null)
 
-  // 灯箱导航范围：行程详情内翻行程照片，否则翻全部已定位媒体
-  const lightboxPhotos = useMemo(() => (activeTrip ? activeTrip.photos : locatedPhotos), [activeTrip, locatedPhotos])
+  // 灯箱导航范围：由打开入口决定（回忆板块 / 行程 / 全部已定位媒体）
+  const lightboxPhotos = useMemo(
+    () => lightboxNav ?? (activeTrip ? activeTrip.photos : locatedPhotos),
+    [lightboxNav, activeTrip, locatedPhotos],
+  )
 
   // 行程轨迹：已定位照片按拍摄顺序连线
   const tripPath = useMemo<[number, number][] | null>(() => {
@@ -83,8 +90,9 @@ export default function App() {
   }, [activeTrip])
 
   const openLightbox = useCallback(
-    (photo: PhotoRecord) => {
+    (photo: PhotoRecord, navList?: PhotoRecord[]) => {
       closeSidebarOnMobile()
+      setLightboxNav(navList ?? null)
       const city =
         photo.lat !== undefined && photo.lng !== undefined && citiesRef.current
           ? findNearestCity(citiesRef.current, photo.lat, photo.lng)
@@ -178,6 +186,12 @@ export default function App() {
 
   const handleBackFromTrip = useCallback(() => setActiveTrip(null), [])
 
+  const handleOpenMemory = useCallback(() => {
+    setLightbox(null)
+    closeSidebarOnMobile()
+    setMemoryOpen(true)
+  }, [closeSidebarOnMobile])
+
   return (
     <div
       className="app"
@@ -196,6 +210,7 @@ export default function App() {
         activeTrip={activeTrip}
         cities={cities}
         sidebarOpen={sidebarOpen}
+        onOpenMemory={handleOpenMemory}
         onCloseSidebar={() => setSidebarOpen(false)}
         onImportDirectory={handleImportDirectory}
         onImportFiles={handleImportFiles}
@@ -253,6 +268,9 @@ export default function App() {
         )}
         {dragging && <div className="drop-hint">松手开始导入</div>}
       </main>
+      {memoryOpen && (
+        <MemoryView photos={photos} cities={cities} onClose={() => setMemoryOpen(false)} onOpenPhoto={openLightbox} />
+      )}
       {lightbox && (
         <Lightbox
           photos={lightboxPhotos}

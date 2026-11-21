@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { CityEntry } from '../lib/cities'
+import { onThisDay } from '../lib/memories'
 import type { CityVisit, ImportProgress, ImportSummary, PhotoRecord, Trip } from '../lib/types'
 import TripDetail from './TripDetail'
 
@@ -32,6 +33,7 @@ interface SidebarProps {
   cities: CityEntry[] | null
   sidebarOpen: boolean
   onCloseSidebar: () => void
+  onOpenMemory: () => void
   onImportDirectory: () => void
   onImportFiles: (files: FileList | File[]) => void
   onSelectTrip: (trip: Trip) => void
@@ -59,6 +61,7 @@ export default function Sidebar({
   cities,
   sidebarOpen,
   onCloseSidebar,
+  onOpenMemory,
   onImportDirectory,
   onImportFiles,
   onSelectTrip,
@@ -87,6 +90,8 @@ export default function Sidebar({
     }
     return parts.join(' · ')
   }, [photos.length, cityVisits.length, trips])
+
+  const todayMemories = useMemo(() => onThisDay(photos), [photos])
 
   return (
     <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
@@ -185,6 +190,21 @@ export default function Sidebar({
         <TripDetail trip={activeTrip} cities={cities} onBack={onBackFromTrip} onOpenPhoto={onOpenPhoto} />
       ) : (
         <>
+          {photos.length > 0 && (
+            <section className="panel">
+              <h2>回忆</h2>
+              {todayMemories.length > 0 ? (
+                <button className="memory-highlight" onClick={onOpenMemory}>
+                  ✨ {todayMemories.reduce((s, g) => s + g.photos.length, 0)} 张照片来自{' '}
+                  {todayMemories.length} 年前的今天 · 点开看看
+                </button>
+              ) : (
+                <button className="btn memory-open-btn" onClick={onOpenMemory}>
+                  打开回忆视图
+                </button>
+              )}
+            </section>
+          )}
           {undetermined.length > 0 && (
             <section className="panel">
               <h2>手动标点</h2>
