@@ -17,6 +17,7 @@ import Sidebar from './components/Sidebar'
 import MapView from './components/MapView'
 import Lightbox from './components/Lightbox'
 import MemoryView from './components/MemoryView'
+import SettingsPage from './components/SettingsPage'
 
 // useLiveQuery 尚未返回时的稳定空数组，避免下游 useMemo 依赖抖动
 const EMPTY_PHOTOS: PhotoRecord[] = []
@@ -86,6 +87,7 @@ export default function App() {
 
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null)
   const [memoryOpen, setMemoryOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   /** 灯箱导航范围：由打开入口决定（回忆板块 / 行程 / 全部已定位） */
   const [lightboxNav, setLightboxNav] = useState<PhotoRecord[] | null>(null)
   /** 地理就近链的起点 = 打开灯箱时的那张照片（浏览期间保持稳定，避免互为最近的往返死循环） */
@@ -224,6 +226,12 @@ export default function App() {
     setMemoryOpen(true)
   }, [closeSidebarOnMobile])
 
+  const handleOpenSettings = useCallback(() => {
+    setLightbox(null)
+    closeSidebarOnMobile()
+    setSettingsOpen(true)
+  }, [closeSidebarOnMobile])
+
   return (
     <div
       className="app"
@@ -243,10 +251,7 @@ export default function App() {
         cities={cities}
         sidebarOpen={sidebarOpen}
         onOpenMemory={handleOpenMemory}
-        browseByTime={browseByTime}
-        onBrowseByTimeChange={handleBrowseByTimeChange}
-        basemapId={basemapId}
-        onBasemapChange={handleBasemapChange}
+        onOpenSettings={handleOpenSettings}
         onCloseSidebar={() => setSidebarOpen(false)}
         onImportDirectory={handleImportDirectory}
         onImportFiles={handleImportFiles}
@@ -305,9 +310,18 @@ export default function App() {
         )}
         {dragging && <div className="drop-hint">松手开始导入</div>}
       </main>
-        {memoryOpen && (
-          <MemoryView photos={photos} cities={cities} onClose={() => setMemoryOpen(false)} onOpenPhoto={openLightbox} />
-        )}
+      {memoryOpen && (
+        <MemoryView photos={photos} cities={cities} onClose={() => setMemoryOpen(false)} onOpenPhoto={openLightbox} />
+      )}
+      {settingsOpen && (
+        <SettingsPage
+          browseByTime={browseByTime}
+          onBrowseByTimeChange={handleBrowseByTimeChange}
+          basemapId={basemapId}
+          onBasemapChange={handleBasemapChange}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
         {lightbox && (
           <Lightbox
             photos={lightboxPhotos}

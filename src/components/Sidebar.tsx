@@ -34,10 +34,7 @@ interface SidebarProps {
   sidebarOpen: boolean
   onCloseSidebar: () => void
   onOpenMemory: () => void
-  browseByTime: boolean
-  onBrowseByTimeChange: (v: boolean) => void
-  basemapId: string
-  onBasemapChange: (id: string) => void
+  onOpenSettings: () => void
   onImportDirectory: () => void
   onImportFiles: (files: FileList | File[]) => void
   onSelectTrip: (trip: Trip) => void
@@ -66,10 +63,7 @@ export default function Sidebar({
   sidebarOpen,
   onCloseSidebar,
   onOpenMemory,
-  browseByTime,
-  onBrowseByTimeChange,
-  basemapId,
-  onBasemapChange,
+  onOpenSettings,
   onImportDirectory,
   onImportFiles,
   onSelectTrip,
@@ -106,9 +100,21 @@ export default function Sidebar({
       <header className="brand">
         <div className="brand-top">
           <div className="brand-mark">FOOTPRINT ALBUM</div>
-          <button className="sidebar-close" onClick={onCloseSidebar} aria-label="收起面板" title="收起面板">
-            ×
-          </button>
+          <div className="brand-actions">
+            <button className="icon-btn" onClick={onOpenSettings} aria-label="打开设置" title="设置">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <line x1="4" y1="7" x2="20" y2="7" />
+                <circle cx="9" cy="7" r="2" fill="currentColor" stroke="none" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" />
+                <line x1="4" y1="17" x2="20" y2="17" />
+                <circle cx="7" cy="17" r="2" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
+            <button className="sidebar-close" onClick={onCloseSidebar} aria-label="收起面板" title="收起面板">
+              ×
+            </button>
+          </div>
         </div>
         <button
           className="brand-quote"
@@ -271,37 +277,20 @@ export default function Sidebar({
             </section>
           )}
           <section className="panel">
-            <h2>设置</h2>
-            <label className="setting-row">
-              <div>
-                <div className="setting-name">按拍摄时间浏览</div>
-                <div className="setting-desc">开启后"下一张"按拍摄时间顺序；关闭时跳到地理位置最近的照片（行程内始终按时间）</div>
-              </div>
-              <span className="switch">
-                <input
-                  type="checkbox"
-                  checked={browseByTime}
-                  onChange={(e) => onBrowseByTimeChange(e.target.checked)}
-                />
-                <span className="track" />
-                <span className="thumb" />
-              </span>
-            </label>
-            <label className="setting-row">
-              <div>
-                <div className="setting-name">底图</div>
-              </div>
-              <select
-                className="setting-select"
-                value={basemapId}
-                onChange={(e) => onBasemapChange(e.target.value)}
-              >
-                <option value="esri-satellite">Esri 卫星</option>
-                <option value="esri-dark">Esri 暗色</option>
-                <option value="esri-street">Esri 街道</option>
-                <option value="osm">OpenStreetMap</option>
-              </select>
-            </label>
+            <h2>旅行行程</h2>
+            <ul className="trip-list">
+              {trips.map((t) => (
+                <li key={t.id}>
+                  <button className="trip-item" onClick={() => onSelectTrip(t)}>
+                    <span className="trip-date">
+                      {fmtDate(t.startAt)}
+                      {fmtDate(t.startAt) !== fmtDate(t.endAt) && ` – ${fmtDate(t.endAt)}`}
+                    </span>
+                    <span className="trip-count">{t.photos.length} 张</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </section>
         </>
       )}

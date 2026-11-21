@@ -187,17 +187,12 @@ export default function MapView({ photos, focus, onOpenPhoto, placement, onMapCl
     map.getCanvas().style.cursor = placement ? 'crosshair' : ''
   }, [placement])
 
-  // 底图切换：setStyle 会清空自定义图层，轨迹线随依赖重建
+  // 底图 + 轨迹线：合并管理。setStyle 会清空自定义图层，
+  // 先挂 style.load 监听再切换，就绪后重建轨迹图层（确保不与 setStyle 竞态）。
+  const lastStyleIdRef = useRef<string | null>(null)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !basemapId) return
-    map.setStyle(buildStyle(BASEMAPS.find((b) => b.id === basemapId) ?? DEFAULT_BASEMAP))
-  }, [basemapId])
-
-  // 行程轨迹线（光晕 + 实线两层，按拍摄顺序连接）
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
 
     const ensureLayers = () => {
       if (map.getSource('trip-path')) return
@@ -230,16 +225,26 @@ export default function MapView({ photos, focus, onOpenPhoto, placement, onMapCl
       )
     }
 
-    if (map.isStyleLoaded()) {
+    const ensureAndApply = () => {
       ensureLayers()
       applyData()
-    } else {
-      map.once('style.load', () => {
-        ensureLayers()
-        applyData()
-      })
     }
-  }, [tripPath, basemapId])
+
+    const run = () => {
+      if (lastStyleIdRef.current !== basemapId) {
+        map.once('style.load', ensureAndApply) // 先挂监听再切换，避免竞态
+        map.setStyle(buildStyle(BASEMAPS.find((b) => b.id === basemapId) ?? DEFAULT_BASEMAP))
+        lastStyleIdRef.current = basemapId
+        // setStyle 后立即检查一次（style.load 可能已触发完毕）
+        if (map.isStyleLoaded()) ensureAndApply()
+        return
+      }
+      if (map.isStyleLoaded()) ensureAndApply()
+      else map.once('style.load', ensureAndApply)
+    }
+
+    run()
+  }, [basemapId, tripPath])
 
   return <div ref={containerRef} className="map-container" />
 }
