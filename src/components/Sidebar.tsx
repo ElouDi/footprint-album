@@ -3,18 +3,20 @@ import type { CityEntry } from '../lib/cities'
 import type { CityVisit, ImportProgress, ImportSummary, PhotoRecord, Trip } from '../lib/types'
 import TripDetail from './TripDetail'
 
-/** 打开时随机展示一句，点击可换 */
+/** 打开时随机展示一句，点击可换 —— 文学家/名人的旅行名句 */
 const QUOTES: { text: string; author?: string }[] = [
   { text: '世界是一本书，不旅行的人只读了其中一页。', author: '圣奥古斯丁' },
-  { text: '旅行的真谛，不是运动，而是带着你的灵魂，去寻找生命的春光。', author: '梭罗' },
-  { text: '身体和灵魂，总有一个在路上。' },
-  { text: '走过的路，每一步都算数。' },
-  { text: '重要的不是目的地，而是沿途的风景，和看风景的心情。' },
-  { text: '地图上的每一个点，都藏着一段出发的理由。' },
-  { text: '把日子过成值得回忆的样子，就是最好的旅行。' },
-  { text: '山川湖海，都是时间的注脚。' },
-  { text: '照片会变旧，回忆不会。' },
-  { text: '去看世界，也顺便找到自己。' },
+  { text: '群山在召唤，我必须出发。', author: '约翰·缪尔' },
+  { text: '旅行最试验得出一个人的品行；旅行时最劳顿，最麻烦，叫人本相毕现。', author: '钱锺书《围城》' },
+  { text: '世之奇伟、瑰怪、非常之观，常在于险远。', author: '王安石《游褒禅山记》' },
+  { text: '五岳寻仙不辞远，一生好入名山游。', author: '李白《庐山谣》' },
+  { text: '此心安处是吾乡。', author: '苏轼《定风波》' },
+  { text: '大丈夫当朝碧海而暮苍梧。', author: '徐霞客' },
+  { text: '我们所有探索的终点，是回到出发点，并第一次真正认识它。', author: '艾略特《四个四重奏》' },
+  { text: '真正的发现之旅，不在于寻找新的风景，而在于拥有新的眼睛。', author: '普鲁斯特《追忆似水年华》' },
+  { text: '旅行是消灭偏见、固执与狭隘的最好方式。', author: '马克·吐温《傻子出国记》' },
+  { text: '既然选择了远方，便只顾风雨兼程。', author: '汪国真《热爱生命》' },
+  { text: '旅行真正的快乐不在于目的地，而在于它的过程。', author: '三毛' },
 ]
 
 interface SidebarProps {
