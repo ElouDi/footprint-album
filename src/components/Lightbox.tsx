@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { googleStreetViewUrl, osmUrl } from '../lib/links'
 import { thumbUrl } from '../lib/thumbUrls'
 import type { PhotoRecord } from '../lib/types'
 
@@ -12,10 +13,6 @@ interface LightboxProps {
 
 function fmtDateTime(ms: number): string {
   return new Date(ms).toLocaleString('zh-CN', { hour12: false })
-}
-
-function fmtCoordsLink(lat: number, lng: number): string {
-  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`
 }
 
 /** 尝试通过持久化的文件句柄打开原图（Chrome/Edge）；Firefox/Safari 只有缩略图 */
@@ -146,15 +143,27 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
           <div className="lightbox-tags">
             {photo.takenAt !== undefined && <span className="lightbox-tag">{fmtDateTime(photo.takenAt)}</span>}
             {cityName && <span className="lightbox-tag city">{cityName}</span>}
+            {coords && <span className="lightbox-tag">{coords}</span>}
             {coords && (
               <a
                 className="lightbox-tag link"
-                href={fmtCoordsLink(photo.lat as number, photo.lng as number)}
+                href={googleStreetViewUrl(photo.lat as number, photo.lng as number)}
+                target="_blank"
+                rel="noreferrer"
+                title="在 Google 街景中打开这个位置"
+              >
+                街景 ↗
+              </a>
+            )}
+            {coords && (
+              <a
+                className="lightbox-tag link"
+                href={osmUrl(photo.lat as number, photo.lng as number)}
                 target="_blank"
                 rel="noreferrer"
                 title="在 OpenStreetMap 中查看"
               >
-                {coords} ↗
+                OSM ↗
               </a>
             )}
             {photo.gpsImgDirection !== undefined && (
