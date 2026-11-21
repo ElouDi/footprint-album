@@ -36,6 +36,7 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
   const [src, setSrc] = useState<string | null>(null)
   const [showingOriginal, setShowingOriginal] = useState(false)
   const [placeName, setPlaceName] = useState<string | null>(cityName ?? null)
+  const [zoomed, setZoomed] = useState(false)
 
   const index = photos.findIndex((p) => p.id === photo.id)
   const hasPrev = index > 0
@@ -43,12 +44,13 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
   const lat = photo.lat
   const lng = photo.lng
 
-  // 切换照片时重置图片来源：先出缩略图，句柄可用再换原图
+  // 切换照片时重置图片来源与缩放：先出缩略图，句柄可用再换原图
   useEffect(() => {
     let revoked: string | null = null
     let cancelled = false
     setSrc(null)
     setShowingOriginal(false)
+    setZoomed(false)
 
     void (async () => {
       const thumb = await thumbUrl(photo.id)
@@ -92,7 +94,10 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
   // 键盘操作：Esc 关闭，← → 切换
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
       if (e.key === 'ArrowLeft' && hasPrev) onNavigate(photos[index - 1])
       if (e.key === 'ArrowRight' && hasNext) onNavigate(photos[index + 1])
     }
@@ -107,7 +112,10 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
 
   return (
     <div className="lightbox" onClick={onClose}>
-      <div className="lightbox-body" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`lightbox-body${zoomed ? ' zoomed' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         {hasPrev && (
           <button
             className="lightbox-nav left"
@@ -127,7 +135,7 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
           </button>
         )}
 
-        <div className="lightbox-stage" onClick={onClose}>
+        <div className="lightbox-stage" onClick={(e) => e.stopPropagation()}>
           {photo.kind === 'video' && showingOriginal ? (
             <video
               key={photo.id}
@@ -138,7 +146,16 @@ export default function Lightbox({ photos, entry, onNavigate, onClose }: Lightbo
               onClick={(e) => e.stopPropagation()}
             />
           ) : src ? (
-            <img key={photo.id} src={src} alt={photo.fileName} onClick={(e) => e.stopPropagation()} />
+            <img
+              key={photo.id}
+              src={src}
+              alt={photo.fileName}
+              onClick={(e) => {
+                e.stopPropagation()
+                setZoomed((z) => !z) // 点击图片：网页内放大到 90% / 还原
+              }}
+              title={zoomed ? '点击还原' : '点击放大'}
+            />
           ) : (
             <div className="lightbox-placeholder" onClick={(e) => e.stopPropagation()}>
               无法加载图片

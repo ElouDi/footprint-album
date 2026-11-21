@@ -91,10 +91,12 @@ export default function Sidebar({
   return (
     <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
       <header className="brand">
-        <button className="sidebar-close" onClick={onCloseSidebar} aria-label="收起面板" title="收起面板">
-          ×
-        </button>
-        <div className="brand-mark">FOOTPRINT ALBUM</div>
+        <div className="brand-top">
+          <div className="brand-mark">FOOTPRINT ALBUM</div>
+          <button className="sidebar-close" onClick={onCloseSidebar} aria-label="收起面板" title="收起面板">
+            ×
+          </button>
+        </div>
         <button
           className="brand-quote"
           onClick={() => setQuoteIndex((i) => (i + 1) % QUOTES.length)}
