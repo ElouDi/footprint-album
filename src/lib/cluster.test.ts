@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupByDay, haversineKm, segmentTrips, TRIP_DISTANCE_GAP_KM, TRIP_TIME_GAP_MS } from './cluster'
+import { groupByDay, haversineKm, nearestNeighborChain, segmentTrips, TRIP_DISTANCE_GAP_KM, TRIP_TIME_GAP_MS } from './cluster'
 import type { PhotoRecord } from './types'
 
 function photo(partial: Partial<PhotoRecord> & { id: string }): PhotoRecord {
@@ -68,6 +68,30 @@ describe('segmentTrips', () => {
 
   it('空列表返回空行程', () => {
     expect(segmentTrips([])).toEqual([])
+  })
+})
+
+describe('nearestNeighborChain', () => {
+  // 四个点：A 与 B 相邻约 2.6km，C 距 B 约 25km，D 距 A 约 135km
+  const a = photo({ id: 'A', lat: 35.0, lng: 135.0, takenAt: 1000 })
+  const b = photo({ id: 'B', lat: 35.02, lng: 135.01, takenAt: 4000 })
+  const c = photo({ id: 'C', lat: 35.2, lng: 135.3, takenAt: 3000 })
+  const d = photo({ id: 'D', lat: 36.0, lng: 136.0, takenAt: 2000 })
+
+  it('从 A 出发按贪心最近邻连线', () => {
+    const chain = nearestNeighborChain([a, b, c, d], a)
+    expect(chain.map((p) => p.id)).toEqual(['A', 'B', 'C', 'D'])
+  })
+
+  it('从 C 出发同样稳定，不产生往返死循环', () => {
+    const chain = nearestNeighborChain([a, b, c, d], c)
+    expect(chain.map((p) => p.id)).toEqual(['C', 'B', 'A', 'D'])
+  })
+
+  it('起点未定位时回退为按拍摄时间排序', () => {
+    const noGps = photo({ id: 'N', takenAt: 500 })
+    const chain = nearestNeighborChain([d, a, noGps, b, c], noGps)
+    expect(chain.map((p) => p.id)).toEqual(['A', 'D', 'C', 'B']) // takenAt 升序
   })
 })
 

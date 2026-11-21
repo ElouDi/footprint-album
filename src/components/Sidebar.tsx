@@ -34,6 +34,10 @@ interface SidebarProps {
   sidebarOpen: boolean
   onCloseSidebar: () => void
   onOpenMemory: () => void
+  browseByTime: boolean
+  onBrowseByTimeChange: (v: boolean) => void
+  basemapId: string
+  onBasemapChange: (id: string) => void
   onImportDirectory: () => void
   onImportFiles: (files: FileList | File[]) => void
   onSelectTrip: (trip: Trip) => void
@@ -62,6 +66,10 @@ export default function Sidebar({
   sidebarOpen,
   onCloseSidebar,
   onOpenMemory,
+  browseByTime,
+  onBrowseByTimeChange,
+  basemapId,
+  onBasemapChange,
   onImportDirectory,
   onImportFiles,
   onSelectTrip,
@@ -262,6 +270,39 @@ export default function Sidebar({
               </ul>
             </section>
           )}
+          <section className="panel">
+            <h2>设置</h2>
+            <label className="setting-row">
+              <div>
+                <div className="setting-name">按拍摄时间浏览</div>
+                <div className="setting-desc">开启后"下一张"按拍摄时间顺序；关闭时跳到地理位置最近的照片（行程内始终按时间）</div>
+              </div>
+              <span className="switch">
+                <input
+                  type="checkbox"
+                  checked={browseByTime}
+                  onChange={(e) => onBrowseByTimeChange(e.target.checked)}
+                />
+                <span className="track" />
+                <span className="thumb" />
+              </span>
+            </label>
+            <label className="setting-row">
+              <div>
+                <div className="setting-name">底图</div>
+              </div>
+              <select
+                className="setting-select"
+                value={basemapId}
+                onChange={(e) => onBasemapChange(e.target.value)}
+              >
+                <option value="esri-satellite">Esri 卫星</option>
+                <option value="esri-dark">Esri 暗色</option>
+                <option value="esri-street">Esri 街道</option>
+                <option value="osm">OpenStreetMap</option>
+              </select>
+            </label>
+          </section>
         </>
       )}
 

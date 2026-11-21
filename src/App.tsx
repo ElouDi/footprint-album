@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './lib/db'
+import { DEFAULT_BASEMAP } from './lib/basemaps'
 import {
   importFromFileList,
   importFromDirectoryPicker,
@@ -9,7 +10,7 @@ import {
   refreshCityVisits,
   supportsDirectoryPicker,
 } from './lib/importer'
-import { segmentTrips } from './lib/cluster'
+import { segmentTrips, nearestNeighborChain } from './lib/cluster'
 import { findNearestCity, loadCities, type CityEntry } from './lib/cities'
 import type { CityVisit, ImportProgress, ImportSummary, PhotoRecord, Trip } from './lib/types'
 import Sidebar from './components/Sidebar'
@@ -48,6 +49,19 @@ export default function App() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
+  // 设置（持久化在 settings 表）
+  const browseByTime = useLiveQuery(async () => (await db.settings.get('browseByTime'))?.value === true, [], false)
+  const basemapSetting = useLiveQuery(async () => (await db.settings.get('basemap'))?.value as string | undefined, [])
+  const basemapId = basemapSetting ?? DEFAULT_BASEMAP.id
+
+  const handleBrowseByTimeChange = useCallback((v: boolean) => {
+    void db.settings.put({ key: 'browseByTime', value: v })
+  }, [])
+
+  const handleBasemapChange = useCallback((id: string) => {
+    void db.settings.put({ key: 'basemap', value: id })
+  }, [])
+
   // 窄屏下需要看到地图的交互（选行程/标点/看图）自动收起侧栏
   const closeSidebarOnMobile = useCallback(() => {
     if (window.matchMedia('(max-width: 899px)').matches) setSidebarOpen(false)
@@ -74,12 +88,16 @@ export default function App() {
   const [memoryOpen, setMemoryOpen] = useState(false)
   /** 灯箱导航范围：由打开入口决定（回忆板块 / 行程 / 全部已定位） */
   const [lightboxNav, setLightboxNav] = useState<PhotoRecord[] | null>(null)
+  /** 地理就近链的起点 = 打开灯箱时的那张照片（浏览期间保持稳定，避免互为最近的往返死循环） */
+  const [navStart, setNavStart] = useState<PhotoRecord | null>(null)
 
-  // 灯箱导航范围：由打开入口决定（回忆板块 / 行程 / 全部已定位媒体）
-  const lightboxPhotos = useMemo(
-    () => lightboxNav ?? (activeTrip ? activeTrip.photos : locatedPhotos),
-    [lightboxNav, activeTrip, locatedPhotos],
-  )
+  // 灯箱导航范围：回忆板块显式列表 > 行程（时间序）> 全部已定位媒体（受"浏览顺序"设置控制）
+  const lightboxPhotos = useMemo(() => {
+    if (lightboxNav) return lightboxNav
+    if (activeTrip) return activeTrip.photos
+    if (!browseByTime && navStart) return nearestNeighborChain(locatedPhotos, navStart)
+    return locatedPhotos
+  }, [lightboxNav, activeTrip, locatedPhotos, browseByTime, navStart])
 
   // 行程轨迹：已定位照片按拍摄顺序连线
   const tripPath = useMemo<[number, number][] | null>(() => {
@@ -89,17 +107,31 @@ export default function App() {
       .map((p) => [p.lng as number, p.lat as number])
   }, [activeTrip])
 
+  const cityFor = useCallback(
+    (photo: PhotoRecord): string | undefined =>
+      photo.lat !== undefined && photo.lng !== undefined && citiesRef.current
+        ? findNearestCity(citiesRef.current, photo.lat, photo.lng)?.name
+        : undefined,
+    [],
+  )
+
+  /** 打开灯箱（真正的"新打开"）：重置导航范围与就近链起点 */
   const openLightbox = useCallback(
     (photo: PhotoRecord, navList?: PhotoRecord[]) => {
       closeSidebarOnMobile()
       setLightboxNav(navList ?? null)
-      const city =
-        photo.lat !== undefined && photo.lng !== undefined && citiesRef.current
-          ? findNearestCity(citiesRef.current, photo.lat, photo.lng)
-          : null
-      setLightbox({ photo, cityName: city?.name })
+      setNavStart(photo)
+      setLightbox({ photo, cityName: cityFor(photo) })
     },
-    [closeSidebarOnMobile],
+    [closeSidebarOnMobile, cityFor],
+  )
+
+  /** 灯箱内翻页：只换当前照片，不重置就近链起点（否则互为最近的 photos 会往返死循环） */
+  const navigateLightbox = useCallback(
+    (photo: PhotoRecord) => {
+      setLightbox({ photo, cityName: cityFor(photo) })
+    },
+    [cityFor],
   )
 
   // 手动标点：侧栏选中 → 点击地图落点 → 写库并重算城市足迹
@@ -211,6 +243,10 @@ export default function App() {
         cities={cities}
         sidebarOpen={sidebarOpen}
         onOpenMemory={handleOpenMemory}
+        browseByTime={browseByTime}
+        onBrowseByTimeChange={handleBrowseByTimeChange}
+        basemapId={basemapId}
+        onBasemapChange={handleBasemapChange}
         onCloseSidebar={() => setSidebarOpen(false)}
         onImportDirectory={handleImportDirectory}
         onImportFiles={handleImportFiles}
@@ -254,6 +290,7 @@ export default function App() {
           placement={placement}
           onMapClick={handleMapClick}
           tripPath={tripPath}
+          basemapId={basemapId}
         />
         {placement && (
           <div className="placement-banner">
@@ -268,17 +305,17 @@ export default function App() {
         )}
         {dragging && <div className="drop-hint">松手开始导入</div>}
       </main>
-      {memoryOpen && (
-        <MemoryView photos={photos} cities={cities} onClose={() => setMemoryOpen(false)} onOpenPhoto={openLightbox} />
-      )}
-      {lightbox && (
-        <Lightbox
-          photos={lightboxPhotos}
-          entry={lightbox}
-          onNavigate={openLightbox}
-          onClose={() => setLightbox(null)}
-        />
-      )}
+        {memoryOpen && (
+          <MemoryView photos={photos} cities={cities} onClose={() => setMemoryOpen(false)} onOpenPhoto={openLightbox} />
+        )}
+        {lightbox && (
+          <Lightbox
+            photos={lightboxPhotos}
+            entry={lightbox}
+            onNavigate={navigateLightbox}
+            onClose={() => setLightbox(null)}
+          />
+        )}
     </div>
   )
 }

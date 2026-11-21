@@ -74,3 +74,33 @@ export function groupByDay(photos: PhotoRecord[]): Map<string, PhotoRecord[]> {
   }
   return groups
 }
+
+/**
+ * 地理就近浏览链：从 start 出发，每一步走向尚未访问的照片中最近的一张（贪心最近邻）。
+ * 链在打开灯箱时生成并保持稳定——若每步都重算，两张互为最近的照片会无限往返。
+ * start 未定位时回退为按拍摄时间排序。
+ */
+export function nearestNeighborChain(photos: PhotoRecord[], start: PhotoRecord): PhotoRecord[] {
+  const located = photos.filter((p) => p.lat !== undefined && p.lng !== undefined)
+  const byTime = [...located].sort((a, b) => (a.takenAt ?? 0) - (b.takenAt ?? 0))
+  if (start.lat === undefined || start.lng === undefined) return byTime
+  if (!located.some((p) => p.id === start.id)) return byTime
+
+  const rest = located.filter((p) => p.id !== start.id)
+  const chain: PhotoRecord[] = [start]
+  let cur = start
+  while (rest.length > 0) {
+    let bestIdx = 0
+    let bestKm = Infinity
+    for (let i = 0; i < rest.length; i++) {
+      const km = haversineKm(cur.lat as number, cur.lng as number, rest[i].lat as number, rest[i].lng as number)
+      if (km < bestKm) {
+        bestKm = km
+        bestIdx = i
+      }
+    }
+    cur = rest.splice(bestIdx, 1)[0]
+    chain.push(cur)
+  }
+  return chain
+}

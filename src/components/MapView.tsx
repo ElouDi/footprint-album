@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import Supercluster from 'supercluster'
 import { thumbUrl } from '../lib/thumbUrls'
-import { DEFAULT_BASEMAP, buildStyle } from '../lib/basemaps'
+import { BASEMAPS, DEFAULT_BASEMAP, buildStyle } from '../lib/basemaps'
 import type { PhotoRecord } from '../lib/types'
 
 interface MapViewProps {
@@ -14,6 +14,8 @@ interface MapViewProps {
   onMapClick?: (lng: number, lat: number) => void
   /** 行程轨迹：按拍摄顺序连接的坐标（null 清除） */
   tripPath?: [number, number][] | null
+  /** 底图预设 id（设置面板切换） */
+  basemapId?: string
 }
 
 type ClusterFeature = {
@@ -28,7 +30,7 @@ type ClusterFeature = {
   }
 }
 
-export default function MapView({ photos, focus, onOpenPhoto, placement, onMapClick, tripPath }: MapViewProps) {
+export default function MapView({ photos, focus, onOpenPhoto, placement, onMapClick, tripPath, basemapId }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const indexRef = useRef<Supercluster<{ id: string }> | null>(null)
@@ -42,6 +44,9 @@ export default function MapView({ photos, focus, onOpenPhoto, placement, onMapCl
   photosRef.current = photos
   const onMapClickRef = useRef(onMapClick)
   onMapClickRef.current = onMapClick
+  // 初始化只读一次，后续切换走 setStyle（避免 init 依赖抖动）
+  const basemapIdRef = useRef(basemapId)
+  basemapIdRef.current = basemapId
 
   const updateMarkers = useCallback(() => {
     const map = mapRef.current
@@ -105,7 +110,7 @@ export default function MapView({ photos, focus, onOpenPhoto, placement, onMapCl
     if (!containerRef.current) return
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: buildStyle(DEFAULT_BASEMAP),
+      style: buildStyle(BASEMAPS.find((b) => b.id === basemapIdRef.current) ?? DEFAULT_BASEMAP),
       center: [130, 35],
       zoom: 3.2,
       attributionControl: false,
@@ -182,6 +187,13 @@ export default function MapView({ photos, focus, onOpenPhoto, placement, onMapCl
     map.getCanvas().style.cursor = placement ? 'crosshair' : ''
   }, [placement])
 
+  // 底图切换：setStyle 会清空自定义图层，轨迹线随依赖重建
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !basemapId) return
+    map.setStyle(buildStyle(BASEMAPS.find((b) => b.id === basemapId) ?? DEFAULT_BASEMAP))
+  }, [basemapId])
+
   // 行程轨迹线（光晕 + 实线两层，按拍摄顺序连接）
   useEffect(() => {
     const map = mapRef.current
@@ -227,7 +239,7 @@ export default function MapView({ photos, focus, onOpenPhoto, placement, onMapCl
         applyData()
       })
     }
-  }, [tripPath])
+  }, [tripPath, basemapId])
 
   return <div ref={containerRef} className="map-container" />
 }
