@@ -28,6 +28,8 @@ interface SidebarProps {
   placement: { id: string; name: string } | null
   activeTrip: Trip | null
   cities: CityEntry[] | null
+  sidebarOpen: boolean
+  onCloseSidebar: () => void
   onImportDirectory: () => void
   onImportFiles: (files: FileList | File[]) => void
   onSelectTrip: (trip: Trip) => void
@@ -53,6 +55,8 @@ export default function Sidebar({
   placement,
   activeTrip,
   cities,
+  sidebarOpen,
+  onCloseSidebar,
   onImportDirectory,
   onImportFiles,
   onSelectTrip,
@@ -83,8 +87,11 @@ export default function Sidebar({
   }, [photos.length, cityVisits.length, trips])
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
       <header className="brand">
+        <button className="sidebar-close" onClick={onCloseSidebar} aria-label="收起面板" title="收起面板">
+          ×
+        </button>
         <div className="brand-mark">FOOTPRINT ALBUM</div>
         <button
           className="brand-quote"

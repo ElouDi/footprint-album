@@ -37,6 +37,21 @@ export default function App() {
   const [focus, setFocus] = useState<{ points: [number, number][]; key: number } | null>(null)
   const [placement, setPlacement] = useState<{ id: string; name: string } | null>(null)
 
+  // 响应式：手机（<900px）默认收起侧栏，桌面默认弹出；打开页面时判定一次
+  const [isNarrow, setIsNarrow] = useState(() => window.matchMedia('(max-width: 899px)').matches)
+  const [sidebarOpen, setSidebarOpen] = useState(() => !window.matchMedia('(max-width: 899px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 899px)')
+    const onChange = (e: MediaQueryListEvent) => setIsNarrow(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  // 窄屏下需要看到地图的交互（选行程/标点/看图）自动收起侧栏
+  const closeSidebarOnMobile = useCallback(() => {
+    if (window.matchMedia('(max-width: 899px)').matches) setSidebarOpen(false)
+  }, [])
+
   // 城市数据只加载一次：状态供组件使用，ref 供回调即时读取
   const [cities, setCities] = useState<CityEntry[] | null>(null)
   const citiesRef = useRef<CityEntry[] | null>(null)
@@ -67,19 +82,27 @@ export default function App() {
       .map((p) => [p.lng as number, p.lat as number])
   }, [activeTrip])
 
-  const openLightbox = useCallback((photo: PhotoRecord) => {
-    const city =
-      photo.lat !== undefined && photo.lng !== undefined && citiesRef.current
-        ? findNearestCity(citiesRef.current, photo.lat, photo.lng)
-        : null
-    setLightbox({ photo, cityName: city?.name })
-  }, [])
+  const openLightbox = useCallback(
+    (photo: PhotoRecord) => {
+      closeSidebarOnMobile()
+      const city =
+        photo.lat !== undefined && photo.lng !== undefined && citiesRef.current
+          ? findNearestCity(citiesRef.current, photo.lat, photo.lng)
+          : null
+      setLightbox({ photo, cityName: city?.name })
+    },
+    [closeSidebarOnMobile],
+  )
 
   // 手动标点：侧栏选中 → 点击地图落点 → 写库并重算城市足迹
-  const handlePlaceRequest = useCallback((photo: PhotoRecord) => {
-    setLightbox(null)
-    setPlacement({ id: photo.id, name: photo.fileName })
-  }, [])
+  const handlePlaceRequest = useCallback(
+    (photo: PhotoRecord) => {
+      closeSidebarOnMobile()
+      setLightbox(null)
+      setPlacement({ id: photo.id, name: photo.fileName })
+    },
+    [closeSidebarOnMobile],
+  )
 
   const handleCancelPlacement = useCallback(() => setPlacement(null), [])
 
@@ -141,13 +164,17 @@ export default function App() {
     [],
   )
 
-  const handleSelectTrip = useCallback((trip: Trip) => {
-    setActiveTrip(trip)
-    const points = trip.photos
-      .filter((p) => p.lat !== undefined && p.lng !== undefined)
-      .map((p) => [p.lng as number, p.lat as number] as [number, number])
-    if (points.length > 0) setFocus({ points, key: Date.now() })
-  }, [])
+  const handleSelectTrip = useCallback(
+    (trip: Trip) => {
+      closeSidebarOnMobile()
+      setActiveTrip(trip)
+      const points = trip.photos
+        .filter((p) => p.lat !== undefined && p.lng !== undefined)
+        .map((p) => [p.lng as number, p.lat as number] as [number, number])
+      if (points.length > 0) setFocus({ points, key: Date.now() })
+    },
+    [closeSidebarOnMobile],
+  )
 
   const handleBackFromTrip = useCallback(() => setActiveTrip(null), [])
 
@@ -168,6 +195,8 @@ export default function App() {
         placement={placement}
         activeTrip={activeTrip}
         cities={cities}
+        sidebarOpen={sidebarOpen}
+        onCloseSidebar={() => setSidebarOpen(false)}
         onImportDirectory={handleImportDirectory}
         onImportFiles={handleImportFiles}
         onSelectTrip={handleSelectTrip}
@@ -176,6 +205,20 @@ export default function App() {
         onPlaceRequest={handlePlaceRequest}
         onCancelPlacement={handleCancelPlacement}
       />
+      {!sidebarOpen && (
+        <button
+          className="sidebar-toggle"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="打开足迹面板"
+          title="打开足迹面板"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <line x1="4" y1="7" x2="20" y2="7" />
+            <line x1="4" y1="12" x2="15" y2="12" />
+            <line x1="4" y1="17" x2="20" y2="17" />
+          </svg>
+        </button>
+      )}
       <main
         className={`map-area${placement ? ' placement-mode' : ''}`}
         onDragOver={(e) => {
@@ -204,7 +247,7 @@ export default function App() {
         )}
         {photos.length === 0 && !dragging && (
           <div className="empty-hint">
-            <p className="empty-title">把旅行照片文件夹拖到这里</p>
+            <p className="empty-title">{isNarrow ? '点击左上角的 ☰ 开始' : '把旅行照片文件夹拖到这里'}</p>
             <p className="empty-sub">照片不会上传——EXIF 里的位置和时间只保存在你自己的浏览器里</p>
           </div>
         )}
