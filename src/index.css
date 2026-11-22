@@ -170,6 +170,39 @@ body {
   font-weight: 600;
 }
 
+.diag-table {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.diag-row {
+  display: flex;
+  gap: 10px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: 'Cascadia Code', Consolas, monospace;
+}
+
+.diag-row + .diag-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.diag-key {
+  color: var(--accent-2);
+  flex: none;
+  width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diag-value {
+  color: var(--text);
+  word-break: break-all;
+}
+
 .import-error {
   margin: 8px 0 0;
   font-size: 12px;

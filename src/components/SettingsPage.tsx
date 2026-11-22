@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import exifr from 'exifr'
 import { db } from '../lib/db'
 import { BASEMAPS } from '../lib/basemaps'
+import { readPhotoExif } from '../lib/exif'
 import { downloadBackup, validateBackup, type BackupFile } from '../lib/backup'
 import { SIDEBAR_SECTION_NAMES, type SidebarSectionId } from '../lib/sidebarOrder'
 
@@ -34,6 +36,47 @@ export default function SettingsPage({
   const [pendingImport, setPendingImport] = useState<BackupFile | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const [diagFields, setDiagFields] = useState<[string, string][] | null>(null)
+  const [diagLocated, setDiagLocated] = useState<boolean | null>(null)
+  const diagInputRef = useRef<HTMLInputElement>(null)
+
+  // EXIF 诊断：展示解析器从文件里实际读到的原始字段，用于定位"读不到位置"的问题
+  const handleDiagFile = (file: File) => {
+    setDiagFields(null)
+    setDiagLocated(null)
+    void (async () => {
+      const fields: [string, string][] = [['文件名', file.name]]
+      try {
+        const data = (await exifr.parse(file)) as Record<string, unknown> | undefined
+        const keys = [
+          'Make',
+          'Model',
+          'latitude',
+          'longitude',
+          'GPSLatitude',
+          'GPSLongitude',
+          'GPSLatitudeRef',
+          'GPSLongitudeRef',
+          'GPSImgDirection',
+          'DateTimeOriginal',
+          'CreateDate',
+        ]
+        for (const k of keys) {
+          const v = data?.[k]
+          if (v !== undefined) {
+            fields.push([k, typeof v === 'object' ? JSON.stringify(v) : String(v)])
+          }
+        }
+        if (fields.length === 1) fields.push(['EXIF', '整个文件里没有任何 EXIF 字段——GPS 大概率在传输时被抹掉了'])
+        const exif = await readPhotoExif(file)
+        setDiagLocated(!!exif?.lat)
+      } catch (e) {
+        fields.push(['解析失败', String(e)])
+        setDiagLocated(false)
+      }
+      setDiagFields(fields)
+    })()
+  }
 
   const handleImportFile = (file: File) => {
     setPendingImport(null)
@@ -238,6 +281,44 @@ export default function SettingsPage({
             {clearArmed ? '再次点击确认清除（不可恢复）' : '清除所有数据…'}
           </button>
           <p className="hint">备份与清除只影响本机浏览器里的数据；照片原文件始终在你的磁盘上，可重新导入。</p>
+        </section>
+
+        <section className="panel">
+          <h2>EXIF 诊断</h2>
+          <p className="hint" style={{ margin: '0 0 8px' }}>
+            选一张照片，看看解析器实际读到了什么——用来排查"谷歌相册能识别位置，这里读不到"的问题
+          </p>
+          <button className="btn" onClick={() => diagInputRef.current?.click()}>
+            选择照片诊断
+          </button>
+          <input
+            ref={diagInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,image/heic,image/heif"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleDiagFile(f)
+              e.target.value = ''
+            }}
+          />
+          {diagLocated !== null && (
+            <p className="hint" style={{ marginTop: 8 }}>
+              {diagLocated
+                ? '✅ 成功读到 GPS 坐标——这张照片的地点信息是完好的'
+                : '❌ 没有读到可用的 GPS 坐标——这张文件的定位信息已被抹除或缺失'}
+            </p>
+          )}
+          {diagFields && (
+            <div className="diag-table">
+              {diagFields.map(([k, v]) => (
+                <div key={k} className="diag-row">
+                  <span className="diag-key">{k}</span>
+                  <span className="diag-value">{v}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="panel">
