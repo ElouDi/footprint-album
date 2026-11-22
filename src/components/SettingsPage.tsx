@@ -40,34 +40,38 @@ export default function SettingsPage({
   const [diagLocated, setDiagLocated] = useState<boolean | null>(null)
   const diagInputRef = useRef<HTMLInputElement>(null)
 
-  // EXIF 诊断：展示解析器从文件里实际读到的原始字段，用于定位"读不到位置"的问题
+  // EXIF 诊断：展示文件容器签名 + 解析器读到的全部原始字段，用于定位"读不到位置"的问题
   const handleDiagFile = (file: File) => {
     setDiagFields(null)
     setDiagLocated(null)
     void (async () => {
-      const fields: [string, string][] = [['文件名', file.name]]
+      const fields: [string, string][] = [
+        ['文件名', file.name],
+        ['大小', `${(file.size / 1024).toFixed(0)} KB`],
+      ]
       try {
+        // 文件头签名：识别真实容器类型（部分手机照片是 HEIF 容器但扩展名 .jpg）
+        const head = new Uint8Array(await file.slice(0, 16).arrayBuffer())
+        const hex = [...head].map((b) => b.toString(16).padStart(2, '0')).join(' ')
+        fields.push(['文件头 16 字节', hex])
+        let kind = '未知容器'
+        if (head[0] === 0xff && head[1] === 0xd8) kind = 'JPEG'
+        else if (head[0] === 0x89 && head[1] === 0x50) kind = 'PNG'
+        else if (head[4] === 0x66 && head[5] === 0x74 && head[6] === 0x79 && head[7] === 0x70) {
+          kind = `HEIF/MP4 容器（品牌: ${String.fromCharCode(...head.subarray(8, 12))}）`
+        }
+        fields.push(['容器类型', kind])
+
         const data = (await exifr.parse(file)) as Record<string, unknown> | undefined
-        const keys = [
-          'Make',
-          'Model',
-          'latitude',
-          'longitude',
-          'GPSLatitude',
-          'GPSLongitude',
-          'GPSLatitudeRef',
-          'GPSLongitudeRef',
-          'GPSImgDirection',
-          'DateTimeOriginal',
-          'CreateDate',
-        ]
-        for (const k of keys) {
-          const v = data?.[k]
-          if (v !== undefined) {
+        if (data && Object.keys(data).length > 0) {
+          for (const k of Object.keys(data).sort()) {
+            const v = data[k]
+            if (v === undefined) continue
             fields.push([k, typeof v === 'object' ? JSON.stringify(v) : String(v)])
           }
+        } else {
+          fields.push(['EXIF', 'exifr 未解析出任何字段——EXIF 可能已被系统剥离'])
         }
-        if (fields.length === 1) fields.push(['EXIF', '整个文件里没有任何 EXIF 字段——GPS 大概率在传输时被抹掉了'])
         const exif = await readPhotoExif(file)
         setDiagLocated(!!exif?.lat)
       } catch (e) {
